@@ -1,0 +1,374 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>減重衝刺計畫</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { 
+            --hard: #ff6b6b; --sculpt: #4ecdc4; --easy: #ffcc5c; --rest: #a8e6cf; 
+            --bg: #f8f9fa; --card: #ffffff; --text: #2d3436; --primary: #ff6b6b;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif; 
+            background: var(--bg); margin: 0; padding: 15px; color: var(--text); 
+            -webkit-tap-highlight-color: transparent;
+        }
+        .container { max-width: 500px; margin: 0 auto; padding-bottom: 50px; }
+
+
+        /* 可編輯標題樣式 */
+        .editable-title { 
+            text-align: center; margin: 10px 0 15px; font-size: 1.4rem; font-weight: bold; 
+            color: var(--text); border: none; background: transparent; width: 100%; outline: none;
+            display: block;
+        }
+
+
+        .stage-header { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 15px; }
+        .stage-box { background: white; padding: 10px 5px; border-radius: 12px; text-align: center; opacity: 0.4; font-size: 0.7rem; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .stage-box.active { opacity: 1; border: 1.5px solid #f39c12; background: #fffcf0; }
+
+
+        .card { background: var(--card); border-radius: 18px; padding: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 15px; }
+        
+        .date-scroller { display: flex; overflow-x: auto; gap: 8px; padding: 5px 0; -webkit-overflow-scrolling: touch; }
+        .date-scroller::-webkit-scrollbar { display: none; }
+        .date-item { min-width: 50px; text-align: center; padding: 10px 5px; border-radius: 12px; background: #f0f0f0; font-size: 0.75rem; border: none; }
+        .date-item.active { transform: scale(1.05); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+
+
+        .meal-log-box { background: #fdfdfd; padding: 12px; border-radius: 15px; border: 1px solid #eee; margin-bottom: 10px; }
+        .food-item { display: flex; justify-content: space-between; background: #fff; padding: 8px 12px; border-radius: 8px; margin-bottom: 5px; font-size: 0.85rem; border: 1px solid #f0f0f0; align-items: center; }
+        .img-preview { width: 100%; height: 160px; border-radius: 12px; margin-top: 10px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; overflow: hidden; position: relative; }
+        .img-preview img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .btn-primary { background: var(--primary); color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: bold; font-size: 0.9rem; }
+        .btn-del-img { position: absolute; top: 8px; right: 8px; background: var(--primary); color: white; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 14px; z-index: 10; }
+
+
+        .diet-accordion { margin-bottom: 8px; border-radius: 12px; overflow: hidden; border: 1px solid #efefef; }
+        .diet-accordion summary { padding: 12px; font-weight: bold; font-size: 0.85rem; background: white; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+        .diet-accordion summary::after { content: '▼'; font-size: 0.6rem; color: #999; }
+        .diet-accordion[open] summary::after { content: '▲'; }
+        .diet-content { padding: 12px; background: #fafafa; font-size: 0.85rem; line-height: 1.6; border-top: 1px solid #eee; color: #555; }
+        .diet-blue { border-left: 5px solid #74b9ff; }
+        .diet-red { border-left: 5px solid #ff7675; }
+        .diet-yellow { border-left: 5px solid #ffeaa7; }
+        .diet-dark { border-left: 5px solid #636e72; }
+
+
+        .workout-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 5px; border-bottom: 1px solid #f9f9f9; }
+        .video-btn { font-size: 0.7rem; color: var(--primary); border: 1px solid var(--primary); padding: 4px 10px; border-radius: 20px; text-decoration: none; }
+
+
+        .type-hard.active { background: var(--hard); color: white; }
+        .type-sculpt.active { background: var(--sculpt); color: white; }
+        .type-easy.active { background: var(--easy); color: white; }
+        .type-rest.active { background: var(--rest); color: #2e7d32; }
+
+
+        input[type="number"], input[type="text"] { font-size: 16px; } 
+    </style>
+</head>
+<body>
+
+
+<div class="container">
+    <input type="text" id="mainTitle" class="editable-title" placeholder="點擊設定標題..." onchange="saveTitle()">
+
+
+    <div class="stage-header">
+        <div id="stage1" class="stage-box">階段 1<br>啟動期</div>
+        <div id="stage2" class="stage-box">階段 2<br>攻堅期</div>
+        <div id="stage3" class="stage-box">階段 3<br>衝刺期</div>
+    </div>
+
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+            <small id="daysCount"></small>
+            <small>目標: 48kg</small>
+        </div>
+        <div style="height:8px; background:#eee; border-radius:4px; margin-bottom:10px;">
+            <div id="progressFill" style="height:100%; background:linear-gradient(90deg, #4ecdc4, #ff6b6b); border-radius:4px; width:0%"></div>
+        </div>
+        <div class="date-scroller" id="dateScroller"></div>
+    </div>
+
+
+    <div class="card">
+        <h3 style="font-size:1rem; margin-top:0;">⚖️ 體重紀錄</h3>
+        <div style="display:flex; gap:8px;">
+            <input type="number" id="wInput" placeholder="kg" step="0.1" style="flex:1; padding:10px; border-radius:10px; border:1px solid #ddd;">
+            <button onclick="saveWeight()" class="btn-primary">紀錄</button>
+        </div>
+        <div id="weightList" style="max-height:80px; overflow-y:auto; margin-top:10px; font-size:0.8rem;"></div>
+        <canvas id="weightChart" style="margin-top:10px;"></canvas>
+    </div>
+
+
+    <div class="card">
+        <h3 id="currentDayText" style="font-size:1rem; margin-top:0;">今日紀錄</h3>
+        <div id="taskBadge" style="display:inline-block; padding:4px 12px; border-radius:15px; font-weight:bold; font-size:0.75rem; color:white; margin-bottom:15px;"></div>
+        
+        <div class="meal-log-box">
+            <strong>🍱 中午外食</strong>
+            <div style="display:flex; gap:5px; margin:8px 0;">
+                <input type="text" id="lunchInput" placeholder="吃了什麼..." style="flex:1; padding:8px; border-radius:8px; border:1px solid #ddd;">
+                <button onclick="addFood('lunch')" style="background:#666; color:white; border:none; padding:8px 12px; border-radius:8px;">＋</button>
+            </div>
+            <div id="lunchFoodList"></div>
+            <input type="file" accept="image/*" onchange="uploadImg(this, 'lunch')" style="font-size:0.7rem; margin-top:5px;">
+            <div class="img-preview" id="lPreview">中午照片</div>
+        </div>
+
+
+        <div class="meal-log-box">
+            <strong>🍳 晚上自炊</strong>
+            <div style="display:flex; gap:5px; margin:8px 0;">
+                <input type="text" id="dinnerInput" placeholder="做了什麼..." style="flex:1; padding:8px; border-radius:8px; border:1px solid #ddd;">
+                <button onclick="addFood('dinner')" style="background:#666; color:white; border:none; padding:8px 12px; border-radius:8px;">＋</button>
+            </div>
+            <div id="dinnerFoodList"></div>
+            <input type="file" accept="image/*" onchange="uploadImg(this, 'dinner')" style="font-size:0.7rem; margin-top:5px;">
+            <div class="img-preview" id="dPreview">晚上照片</div>
+        </div>
+    </div>
+
+
+    <div class="card" style="padding: 10px;">
+        <h3 style="font-size:1rem; padding-left:5px;">🥗 飲食規劃建議</h3>
+        
+        <details class="diet-accordion diet-blue">
+            <summary>🍱 中午外食原則 (詳細攻略)</summary>
+            <div class="diet-content">
+                <strong>【外食挑選 SOP】</strong><br>
+                • 優先餐廳： 自助餐 > 火鍋(清湯) > 超商 > 便當店。<br>
+                • 澱粉控制： 飯量只吃平常的一半，或改吃地瓜/玉米。<br>
+                • 主菜選擇： 滷雞腿(去皮)、鮮魚、舒肥雞胸、滷排骨(去炸衣)。<br>
+                • 蔬菜補充： 至少選 3 種不同顏色的蔬菜，避開勾芡類配菜。<br>
+                • 過水大法： 若菜色太油，準備一碗熱水將菜過水後再吃。
+            </div>
+        </details>
+
+
+        <details class="diet-accordion diet-red">
+            <summary>🍳 晚上自炊建議 (無澱粉模式)</summary>
+            <div class="diet-content">
+                <strong>【自炊萬能公式：蛋白質 + 大量纖維】</strong><br>
+                • 推薦蛋白質： 乾煎鮭魚、蝦仁炒蛋、氣炸豆腐、嫩煎雞里肌。<br>
+                • 纖維來源： 花椰菜米(可代替飯)、大白菜鍋、蒜炒空心菜、綜合菇類。<br>
+                • 調味原則： 使用海鹽、黑胡椒、橄欖油、蒜頭，避開沙拉醬或勾芡醬油膏。<br>
+                • 小提醒： 晚餐需在 20:00 前結束，給予腸胃充足消化時間。
+            </div>
+        </details>
+
+
+        <details class="diet-accordion diet-yellow">
+            <summary>💡 換餐與抗餓小技巧</summary>
+            <div class="diet-content">
+                • 手搖飲癮： 想喝珍奶改喝「無糖氣泡水」或「無糖豆漿」。<br>
+                • 想吃甜食： 準備 85% 以上黑巧克力或少量藍莓，嚴禁蛋糕點心。<br>
+                • 宵夜飢餓： 喝 200ml 溫熱的水，或吃一個水煮蛋/幾片小黃瓜。<br>
+                • 外食換餐： 如果不得不吃麵攤，選「乾下水/肝連」+「大份燙青菜」，不喝湯。
+            </div>
+        </details>
+
+
+        <details class="diet-accordion diet-dark">
+            <summary>🚫 絕對避開食物 (地雷名單)</summary>
+            <div class="diet-content">
+                • 加工品： 百頁豆腐(純油)、貢丸、甜不辣、香腸、火腿。<br>
+                • 隱形醣類： 勾芡類湯品(大腸麵線、肉羹)、馬鈴薯泥、炸物的外皮。<br>
+                • 高糖水果： 芒果、荔枝、榴槤 (建議改吃芭樂、小番茄)。<br>
+                • 醬料魔鬼： 沙拉醬、花生醬、沙茶醬、甜辣醬。<br>
+                • 液體熱量： 含糖手搖飲、酒精、濃縮果汁。
+            </div>
+        </details>
+    </div>
+
+
+    <div class="card">
+        <h3 style="font-size:1rem; margin-top:0;">🏋️ 運動任務</h3>
+        <div id="workoutList"></div>
+        <div style="display:flex; gap:8px; margin-top:15px;">
+            <input type="text" id="customWorkout" placeholder="新增運動..." style="flex:1; padding:10px; border-radius:10px; border:1px solid #ddd;">
+            <button onclick="addWorkout()" class="btn-primary">＋</button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    const startDate = new Date('2026-01-13');
+    const targetDate = new Date('2026-03-31');
+    let selectedDate = new Date();
+    let db = JSON.parse(localStorage.getItem('v15_DB')) || { 
+        weight: {}, diet: {}, workoutCustom: {}, title: '🏃‍♀️ 7KG 衝刺計畫 v15.0' 
+    };
+
+
+    const basePlans = {
+        hard: { n:'加強燃脂日', c:'var(--hard)', tasks:[{t:'開合跳 50s x 4', l:'Jumping+jacks'}, {t:'波比跳 12次 x 4', l:'Burpees'}, {t:'登山者 40s x 4'}]},
+        sculpt: { n:'線條雕塑日', c:'var(--sculpt)', tasks:[{t:'深蹲 25次 x 4', l:'Squat'}, {t:'平板 60s x 3', l:'Plank'}, {t:'跪姿俯臥撐 15x3'}]},
+        easy: { n:'簡易運動日', c:'var(--easy)', tasks:[{t:'快走 30 分鐘'}, {t:'原地踏步 10 分'}]},
+        rest: { n:'修復休息日', c:'var(--rest)', tasks:[{t:'拉筋 15m'}, {t:'睡眠 8hr'}]}
+    };
+
+
+    function init() {
+        document.getElementById('mainTitle').value = db.title;
+        const total = targetDate - startDate;
+        document.getElementById('progressFill').style.width = Math.min(100, ((new Date() - startDate)/total)*100) + '%';
+        document.getElementById('daysCount').innerText = `剩餘 ${Math.ceil((targetDate - new Date())/(1000*60*60*24))} 天`;
+        
+        const m = new Date().getMonth() + 1;
+        if(m>=1 && m<=3) document.getElementById(`stage${m}`).classList.add('active');
+
+
+        const scroller = document.getElementById('dateScroller');
+        for(let i=-2; i<=7; i++) {
+            const d = new Date(); d.setDate(new Date().getDate() + i);
+            const el = document.createElement('div');
+            const type = getPlanType(d);
+            el.className = `date-item type-${type} ${d.toDateString() === selectedDate.toDateString() ? 'active' : ''}`;
+            el.innerHTML = `${d.getMonth()+1}/${d.getDate()}<br>${['日','一','二','三','四','五','六'][d.getDay()]}`;
+            el.onclick = () => { selectedDate = d; refresh(); };
+            scroller.appendChild(el);
+        }
+        refresh(); initChart();
+    }
+
+
+    function saveTitle() { db.title = document.getElementById('mainTitle').value; save(); }
+
+
+    function refresh() {
+        const dateKey = selectedDate.toLocaleDateString();
+        document.getElementById('currentDayText').innerText = `${selectedDate.getMonth()+1}/${selectedDate.getDate()} 紀錄`;
+        document.querySelectorAll('.date-item').forEach(el => el.classList.toggle('active', el.innerText.startsWith(`${selectedDate.getMonth()+1}/${selectedDate.getDate()}`)));
+
+
+        const p = basePlans[getPlanType(selectedDate)];
+        const badge = document.getElementById('taskBadge');
+        badge.innerText = p.n; badge.style.backgroundColor = p.c;
+
+
+        const tasks = db.workoutCustom[dateKey] || [...p.tasks];
+        document.getElementById('workoutList').innerHTML = tasks.map((tk, i) => `
+            <div class="workout-row">
+                <span style="font-size:0.9rem;"><input type="checkbox"> ${tk.t || tk}</span>
+                <div style="display:flex; gap:10px;">
+                    ${tk.l ? `<a class="video-btn" href="https://www.youtube.com/results?search_query=${tk.l}" target="_blank">🎬</a>` : ''}
+                    <span onclick="delWorkout(${i})" style="color:#ccc;">✕</span>
+                </div>
+            </div>
+        `).join('');
+
+
+        const diet = db.diet[dateKey] || { lItems:[], dItems:[], lImg:'', dImg:'' };
+        document.getElementById('lunchFoodList').innerHTML = (diet.lItems||[]).map((f, i) => `<div class="food-item">${f} <span onclick="delFood('lunch',${i})">✕</span></div>`).join('');
+        document.getElementById('dinnerFoodList').innerHTML = (diet.dItems||[]).map((f, i) => `<div class="food-item">${f} <span onclick="delFood('dinner',${i})">✕</span></div>`).join('');
+        
+        renderImg('lPreview', diet.lImg, 'lunch');
+        renderImg('dPreview', diet.dImg, 'dinner');
+        renderWeightList();
+    }
+
+
+    function renderImg(id, src, meal) {
+        const el = document.getElementById(id);
+        el.innerHTML = src ? `<img src="${src}"><button class="btn-del-img" onclick="deleteImg('${meal}')">✕</button>` : '點選上傳';
+    }
+
+
+    function addFood(meal) {
+        const input = document.getElementById(`${meal}Input`);
+        if(!input.value) return;
+        const dk = selectedDate.toLocaleDateString();
+        if(!db.diet[dk]) db.diet[dk] = { lItems:[], dItems:[], lImg:'', dImg:'' };
+        db.diet[dk][meal === 'lunch' ? 'lItems' : 'dItems'].push(input.value);
+        save(); refresh(); input.value = '';
+    }
+
+
+    function delFood(meal, i) {
+        db.diet[selectedDate.toLocaleDateString()][meal === 'lunch' ? 'lItems' : 'dItems'].splice(i, 1);
+        save(); refresh();
+    }
+
+
+    function uploadImg(input, meal) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const dk = selectedDate.toLocaleDateString();
+                if(!db.diet[dk]) db.diet[dk] = { lItems:[], dItems:[], lImg:'', dImg:'' };
+                db.diet[dk][meal === 'lunch' ? 'lImg' : 'dImg'] = e.target.result;
+                save(); refresh();
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+
+    function deleteImg(meal) {
+        db.diet[selectedDate.toLocaleDateString()][meal === 'lunch' ? 'lImg' : 'dImg'] = '';
+        save(); refresh();
+    }
+
+
+    function addWorkout() {
+        const v = document.getElementById('customWorkout').value;
+        if(!v) return;
+        const dk = selectedDate.toLocaleDateString();
+        if(!db.workoutCustom[dk]) db.workoutCustom[dk] = [...basePlans[getPlanType(selectedDate)].tasks];
+        db.workoutCustom[dk].push(v);
+        save(); refresh(); document.getElementById('customWorkout').value='';
+    }
+
+
+    function delWorkout(i) {
+        const dk = selectedDate.toLocaleDateString();
+        if(!db.workoutCustom[dk]) db.workoutCustom[dk] = [...basePlans[getPlanType(selectedDate)].tasks];
+        db.workoutCustom[dk].splice(i, 1);
+        save(); refresh();
+    }
+
+
+    function saveWeight() {
+        const v = document.getElementById('wInput').value;
+        if(v) { db.weight[selectedDate.toLocaleDateString()] = parseFloat(v); save(); location.reload(); }
+    }
+
+
+    function renderWeightList() {
+        const sorted = Object.keys(db.weight).sort((a,b) => new Date(b) - new Date(a));
+        document.getElementById('weightList').innerHTML = sorted.map(k => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee;"><span>${k}: <b>${db.weight[k]}kg</b></span><span style="color:red" onclick="delW('${k}')">✕</span></div>`).join('');
+    }
+
+
+    function delW(k) { delete db.weight[k]; save(); location.reload(); }
+
+
+    function initChart() {
+        const sorted = Object.keys(db.weight).sort((a,b) => new Date(a) - new Date(b));
+        new Chart(document.getElementById('weightChart'), { type:'line', data:{ labels: sorted.map(k=>k.split('/')[1]+'/'+k.split('/')[2]), datasets:[{label:'kg', data: sorted.map(k=>db.weight[k]), borderColor: '#ff6b6b'}]}});
+    }
+
+
+    function getPlanType(d) {
+        const day = d.getDay();
+        if(day===1||day===5) return 'hard'; if(day===2||day===4) return 'sculpt'; if(day===3||day===6) return 'easy'; return 'rest';
+    }
+
+
+    function save() { localStorage.setItem('v15_DB', JSON.stringify(db)); }
+    init();
+</script>
+</body>
+</html>
